@@ -1,0 +1,292 @@
+name: Build NEBULA HUB PKG
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+
+      # ── 1. Checkout ──────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. System dependencies ───────────────────────────────────────────
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            clang lld llvm \
+            python3 python3-pip \
+            wget curl unzip git \
+            cmake make \
+            imagemagick \
+            dotnet-sdk-8.0
+
+      # ── 3. OpenOrbis toolchain ───────────────────────────────────────────
+      - name: Download OpenOrbis PS4 Toolchain
+        run: |
+          # Detect latest release tag via GitHub API
+          LATEST_TAG=$(curl -s https://api.github.com/repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/latest \
+            | grep '"tag_name"' \
+            | sed -E 's/.*"([^"]+)".*/\1/')
+
+          echo "OpenOrbis latest tag: $LATEST_TAG"
+
+          # The release asset is named after the tag, e.g. v0.5.2.tar.gz
+          ASSET_URL="https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/${LATEST_TAG}/${LATEST_TAG}.tar.gz"
+
+          echo "Downloading: $ASSET_URL"
+          wget -q "$ASSET_URL" -O openorbis.tar.gz
+
+          # Verify download succeeded
+          if [ ! -s openorbis.tar.gz ]; then
+            echo "Primary asset not found, trying alternate naming..."
+            # Some releases use a different name pattern
+            ALT_URL="https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/${LATEST_TAG}/OpenOrbis-PS4-Toolchain-${LATEST_TAG}-linux.tar.gz"
+            wget -q "$ALT_URL" -O openorbis.tar.gz || true
+          fi
+
+          # Final fallback: clone repo (slower but always works)
+          if [ ! -s openorbis.tar.gz ]; then
+            echo "Tarball unavailable — cloning repository instead..."
+            git clone --depth 1 https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain openorbis_repo
+            mv openorbis_repo openorbis
+          else
+            mkdir openorbis
+            tar -xzf openorbis.tar.gz -C openorbis --strip-components=1
+          fi
+
+          # Mark all Linux binaries executable (required by OpenOrbis docs)
+          find openorbis/bin/linux -type f -exec chmod +x {} \; 2>/dev/null || true
+
+          # Set env var for all subsequent steps
+          echo "OO_PS4_TOOLCHAIN=$(pwd)/openorbis" >> $GITHUB_ENV
+          echo "PATH=$(pwd)/openorbis/bin/linux:$PATH" >> $GITHUB_ENV
+
+      # ── 4. Build LibOrbisPkg / PkgTool.Core from source ──────────────────
+      - name: Build PkgTool.Core (LibOrbisPkg)
+        run: |
+          git clone --depth 1 https://github.com/OpenOrbis/LibOrbisPkg pkgtool_src
+          cd pkgtool_src
+          dotnet build PkgTool.Core/PkgTool.Core.csproj \
+            --configuration Release \
+            --output ../pkgtool_bin \
+            -p:TargetFramework=net8.0
+          cd ..
+          echo "PKGTOOL=$(pwd)/pkgtool_bin/PkgTool.Core" >> $GITHUB_ENV
+          echo "PkgTool.Core built successfully"
+          ls -la pkgtool_bin/
+
+      # ── 5. Download NotoSans fonts ────────────────────────────────────────
+      - name: Download fonts
+        run: |
+          mkdir -p assets/fonts
+          wget -q -O assets/fonts/NotoSans-Regular.ttf \
+            "https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Regular.ttf" \
+            || wget -q -O assets/fonts/NotoSans-Regular.ttf \
+               "https://noto-website-2.storage.googleapis.com/pkgs/NotoSans-unhinted.zip" \
+            || true
+          wget -q -O assets/fonts/NotoSans-Bold.ttf \
+            "https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Bold.ttf" || true
+
+          # Fallback: use system DejaVuSans if Noto failed
+          if [ ! -s assets/fonts/NotoSans-Regular.ttf ]; then
+            cp /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf assets/fonts/NotoSans-Regular.ttf
+            cp /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf assets/fonts/NotoSans-Bold.ttf
+            echo "Using DejaVu fallback fonts"
+          fi
+
+      # ── 6. Generate app icons ─────────────────────────────────────────────
+      - name: Generate app icons
+        run: |
+          mkdir -p sce_sys
+
+          # icon0.png — PS4 app tile 228×128
+          convert -size 228x128 \
+            gradient:'#0D0D1A-#1A0A30' \
+            -font DejaVu-Sans-Bold -pointsize 18 \
+            -fill '#9B4FFF' -annotate +14+42 'NEBULA HUB' \
+            -fill '#AAAACC' -pointsize 13 -annotate +14+62 'Avatar & Theme Library' \
+            sce_sys/icon0.png
+
+          # pic0.png — splash 1920×1080
+          convert -size 1920x1080 \
+            gradient:'#07071A-#0A0A20' \
+            -font DejaVu-Sans-Bold -pointsize 96 \
+            -fill '#7B2FFF' -gravity Center -annotate +0-100 'NEBULA HUB' \
+            -font DejaVu-Sans -pointsize 36 \
+            -fill '#6666AA' -gravity Center -annotate +0+20 'The Ultimate PS4 Customization Library' \
+            sce_sys/pic0.png
+
+          cp sce_sys/pic0.png sce_sys/bg0.png
+          echo "Icons generated"
+          ls -la sce_sys/
+
+      # ── 7. Compile source ─────────────────────────────────────────────────
+      - name: Compile NEBULA HUB ELF
+        run: |
+          export OO_PS4_TOOLCHAIN="${{ env.OO_PS4_TOOLCHAIN }}"
+
+          CLANG="${OO_PS4_TOOLCHAIN}/bin/linux/clang++"
+          LLD="${OO_PS4_TOOLCHAIN}/bin/linux/ld.lld"
+
+          # If toolchain clang doesn't exist, fall back to system clang
+          if [ ! -f "$CLANG" ]; then
+            echo "Toolchain clang not found, using system clang++"
+            CLANG="clang++"
+            LLD="ld.lld"
+          fi
+
+          INCLUDES="-I${OO_PS4_TOOLCHAIN}/include -Isrc"
+
+          CXXFLAGS="-target x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
+            -std=c++17 -O2 -D__ORBIS__ \
+            ${INCLUDES}"
+
+          SRCS="src/main.cpp src/db/database.cpp src/net/fetcher.cpp \
+                src/input/controller.cpp src/install/installer.cpp \
+                src/ui/renderer.cpp src/ui/screens.cpp"
+
+          OBJS=""
+          for src in $SRCS; do
+            obj="${src%.cpp}.o"
+            echo "Compiling $src..."
+            $CLANG $CXXFLAGS -c "$src" -o "$obj"
+            OBJS="$OBJS $obj"
+          done
+
+          LIBDIR="${OO_PS4_TOOLCHAIN}/lib"
+
+          echo "Linking..."
+          $LLD -m elf_x86_64 \
+            --script "${OO_PS4_TOOLCHAIN}/link.x" \
+            --eh-frame-hdr \
+            -pie \
+            -z max-page-size=0x4000 \
+            -z relro \
+            -L"${LIBDIR}" \
+            $OBJS \
+            -lSDL2_stub \
+            -lSDL2_image_stub \
+            -lSDL2_ttf_stub \
+            -lSceNet_stub \
+            -lSceHttp_stub \
+            -lSceSsl_stub \
+            -lScePad_stub \
+            -lSceUserService_stub \
+            -lSceSystemService_stub \
+            -lSceVideoOut_stub \
+            -lScePthread_stub \
+            -lkernel_stub \
+            -lc \
+            -lc++ \
+            -lc++abi \
+            -o eboot.elf
+
+          echo "ELF built: $(ls -lh eboot.elf)"
+
+      # ── 8. Create FSELF (signed ELF) ──────────────────────────────────────
+      - name: Create FSELF
+        run: |
+          export OO_PS4_TOOLCHAIN="${{ env.OO_PS4_TOOLCHAIN }}"
+          CREATE_FSELF="${OO_PS4_TOOLCHAIN}/bin/linux/create-fself"
+          if [ ! -f "$CREATE_FSELF" ]; then
+            CREATE_FSELF="${OO_PS4_TOOLCHAIN}/bin/linux/create_fself"
+          fi
+
+          chmod +x "$CREATE_FSELF" 2>/dev/null || true
+
+          "$CREATE_FSELF" \
+            -in eboot.elf \
+            -out eboot.bin \
+            --paid 0x3800000000000011 \
+            --npdrmtype fake \
+            --app \
+            --authinfo 0100000000000000F0000000FFD40000000000000000000000000000000000000000000000000000000800000000000000380000000000008000003800000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+
+          echo "FSELF created: $(ls -lh eboot.bin)"
+
+      # ── 9. Build param.sfo ────────────────────────────────────────────────
+      - name: Build param.sfo
+        run: |
+          export OO_PS4_TOOLCHAIN="${{ env.OO_PS4_TOOLCHAIN }}"
+          SFOTOOL="${OO_PS4_TOOLCHAIN}/bin/linux/sfo_tool"
+
+          if [ ! -f "$SFOTOOL" ]; then
+            # Build param.sfo manually using PkgTool.Core
+            dotnet "${{ env.PKGTOOL }}.dll" sfo_new \
+              --title "NEBULA HUB" \
+              --title-id "NEBU00001" \
+              --app-ver "01.00" \
+              --sdk-ver "5050001" \
+              --category "gd" \
+              sce_sys/param.sfo
+          else
+            chmod +x "$SFOTOOL"
+            "$SFOTOOL" \
+              --create \
+              --title "NEBULA HUB" \
+              --title-id "NEBU00001" \
+              --app-ver "01.00" \
+              sce_sys/param.sfo
+          fi
+          echo "param.sfo: $(ls -lh sce_sys/param.sfo)"
+
+      # ── 10. Generate GP4 and build PKG ────────────────────────────────────
+      - name: Build PKG
+        run: |
+          export OO_PS4_TOOLCHAIN="${{ env.OO_PS4_TOOLCHAIN }}"
+          CREATE_GP4="${OO_PS4_TOOLCHAIN}/bin/linux/create-gp4"
+          if [ ! -f "$CREATE_GP4" ]; then
+            CREATE_GP4="${OO_PS4_TOOLCHAIN}/bin/linux/create_gp4"
+          fi
+          chmod +x "$CREATE_GP4" 2>/dev/null || true
+
+          # Generate .gp4 project file
+          "$CREATE_GP4" \
+            -out project.gp4 \
+            --content-id "NEBU00001-NEBU00001_00-NEBULAHUB0000001" \
+            --app-path . \
+            --title-id "NEBU00001" \
+            --version "01.00"
+
+          echo "GP4 generated:"
+          cat project.gp4
+
+          # Build the PKG using PkgTool.Core
+          dotnet "${{ env.PKGTOOL }}.dll" \
+            pkg_build \
+            project.gp4 \
+            . \
+            nebulahub.pkg
+
+          echo ""
+          echo "=============================="
+          echo "  PKG BUILT SUCCESSFULLY"
+          echo "=============================="
+          ls -lh nebulahub.pkg
+
+      # ── 11. Upload artifact ───────────────────────────────────────────────
+      - name: Upload PKG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nebulahub-pkg
+          path: nebulahub.pkg
+          retention-days: 90
+
+      # ── 12. Release on tag push ───────────────────────────────────────────
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: nebulahub.pkg
+          name: "NEBULA HUB ${{ github.ref_name }}"
+          body: |
+            ## NEBULA HUB ${{ github.ref_name }}
+            PS4 homebrew — avatar & theme library.
+            Requires GoldHEN. Install via Package Installer.

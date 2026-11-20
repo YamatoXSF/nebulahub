@@ -1,0 +1,2 @@
+Icons (icon0.png, pic0.png, bg0.png) are generated automatically by the GitHub Actions build step using ImageMagick.
+If building locally, place your own 228x128 icon0.png, 1920x1080 pic0.png and bg0.png here.
