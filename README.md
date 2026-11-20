@@ -187,3 +187,4 @@ python3 scripts/gen_manifest.py --output manifest/manifest.json
 
 Upload the new manifest to your `nebulahub-cdn` repo — no PKG rebuild needed.
 The app fetches the manifest on launch and updates its local database automatically.
+# trigger Fri Nov 20 09:29:48 CET 2026
