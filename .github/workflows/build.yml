@@ -19,38 +19,62 @@ jobs:
           sudo apt-get install -y \
             clang lld llvm \
             python3 wget curl unzip git cmake make imagemagick \
-            dotnet-sdk-8.0 \
-            libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev
+            dotnet-sdk-8.0
+          # NOTE: do NOT install libsdl2-dev — we use OpenOrbis SDL2 stubs only
 
       - name: Get OpenOrbis PS4 Toolchain
         run: |
-          git clone --depth 1 https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain.git openorbis
+          git clone --depth 1 \
+            https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain.git openorbis
           find openorbis/bin/linux -type f -exec chmod +x {} \; 2>/dev/null || true
           echo "OO_PS4_TOOLCHAIN=$(pwd)/openorbis" >> $GITHUB_ENV
-          ls openorbis/bin/linux/
+          echo "Toolchain SDL2 headers:"
+          ls openorbis/include/SDL2/ 2>/dev/null || echo "(no SDL2 dir in toolchain)"
+          echo "Full include listing:"
+          ls openorbis/include/ | head -30
 
       - name: Build PkgTool.Core
         run: |
-          git clone --depth 1 https://github.com/OpenOrbis/LibOrbisPkg.git pkgtool_src
+          git clone --depth 1 \
+            https://github.com/OpenOrbis/LibOrbisPkg.git pkgtool_src
           cd pkgtool_src
-          dotnet build PkgTool.Core/PkgTool.Core.csproj --configuration Release --output ../pkgtool_bin -p:TargetFramework=net8.0
+          dotnet build PkgTool.Core/PkgTool.Core.csproj \
+            --configuration Release \
+            --output ../pkgtool_bin \
+            -p:TargetFramework=net8.0
           cd ..
           PKGTOOL_DLL=$(find pkgtool_bin -name "PkgTool.Core.dll" | head -1)
           echo "PKGTOOL_DLL=$PKGTOOL_DLL" >> $GITHUB_ENV
+          echo "Built: $PKGTOOL_DLL"
 
       - name: Get fonts
         run: |
           mkdir -p assets/fonts
-          curl -sfL -o assets/fonts/NotoSans-Regular.ttf "https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Regular.ttf" || true
-          curl -sfL -o assets/fonts/NotoSans-Bold.ttf "https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Bold.ttf" || true
-          [ ! -s assets/fonts/NotoSans-Regular.ttf ] && cp /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf assets/fonts/NotoSans-Regular.ttf || true
-          [ ! -s assets/fonts/NotoSans-Bold.ttf ] && cp /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf assets/fonts/NotoSans-Bold.ttf || true
+          curl -sfL -o assets/fonts/NotoSans-Regular.ttf \
+            "https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Regular.ttf" || true
+          curl -sfL -o assets/fonts/NotoSans-Bold.ttf \
+            "https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Bold.ttf" || true
+          [ ! -s assets/fonts/NotoSans-Regular.ttf ] && \
+            cp /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf assets/fonts/NotoSans-Regular.ttf || true
+          [ ! -s assets/fonts/NotoSans-Bold.ttf ] && \
+            cp /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf assets/fonts/NotoSans-Bold.ttf || true
 
       - name: Generate app icons
         run: |
           mkdir -p sce_sys
-          convert -size 228x128 gradient:'#0D0D1A-#1A0A30' -font DejaVu-Sans-Bold -pointsize 18 -fill '#9B4FFF' -annotate +14+42 'NEBULA HUB' -fill '#AAAACC' -pointsize 13 -annotate +14+62 'Avatar & Theme Library' sce_sys/icon0.png
-          convert -size 1920x1080 gradient:'#07071A-#0A0A20' -font DejaVu-Sans-Bold -pointsize 96 -fill '#7B2FFF' -gravity Center -annotate +0-100 'NEBULA HUB' -font DejaVu-Sans -pointsize 36 -fill '#6666AA' -gravity Center -annotate +0+20 'The Ultimate PS4 Customization Library' sce_sys/pic0.png
+          convert -size 228x128 gradient:'#0D0D1A-#1A0A30' \
+            -font DejaVu-Sans-Bold -pointsize 18 \
+            -fill '#9B4FFF' -annotate +14+42 'NEBULA HUB' \
+            -fill '#AAAACC' -pointsize 13 \
+            -annotate +14+62 'Avatar & Theme Library' \
+            sce_sys/icon0.png
+          convert -size 1920x1080 gradient:'#07071A-#0A0A20' \
+            -font DejaVu-Sans-Bold -pointsize 96 \
+            -fill '#7B2FFF' -gravity Center -annotate +0-100 'NEBULA HUB' \
+            -font DejaVu-Sans -pointsize 36 \
+            -fill '#6666AA' -gravity Center \
+            -annotate +0+20 'The Ultimate PS4 Customization Library' \
+            sce_sys/pic0.png
           cp sce_sys/pic0.png sce_sys/bg0.png
 
       - name: Compile NEBULA HUB ELF
@@ -59,12 +83,18 @@ jobs:
           CLANG="$OO/bin/linux/clang++" ; [ -f "$CLANG" ] || CLANG="clang++"
           LLD="$OO/bin/linux/ld.lld"   ; [ -f "$LLD"   ] || LLD="ld.lld"
 
-          # SDL2 headers from system apt package, PS4 stubs for linking
-          SDL2_INC=$(sdl2-config --cflags 2>/dev/null || echo "-I/usr/include/SDL2")
-
+          # ONLY use OpenOrbis include dir — no system SDL2 headers
+          # OpenOrbis ships PS4-compatible SDL2 stub headers under its include/
           CXXFLAGS="-target x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
                     -std=c++17 -O2 -D__ORBIS__ \
-                    -I$OO/include -Isrc $SDL2_INC"
+                    -I$OO/include \
+                    -Isrc \
+                    -isystem $OO/include"
+
+          echo "Include path: $OO/include"
+          echo "SDL2 headers available:"
+          ls "$OO/include/SDL2/" 2>/dev/null || echo "No SDL2 dir — checking flat..."
+          find "$OO/include" -name "SDL.h" 2>/dev/null
 
           SRCS="src/main.cpp src/db/database.cpp src/net/fetcher.cpp \
                 src/input/controller.cpp src/install/installer.cpp \
@@ -98,7 +128,8 @@ jobs:
             [ -f "$OO/bin/linux/$n" ] && FSELF="$OO/bin/linux/$n" && break
           done
           chmod +x "$FSELF"
-          "$FSELF" -in eboot.elf -out eboot.bin --paid 0x3800000000000011 \
+          "$FSELF" -in eboot.elf -out eboot.bin \
+            --paid 0x3800000000000011 \
             --npdrmtype fake --app \
             --authinfo 0100000000000000F0000000FFD40000000000000000000000000000000000000000000000000000000800000000000000380000000000008000003800000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
           ls -lh eboot.bin
@@ -112,9 +143,19 @@ jobs:
           done
           if [ -n "$SFOTOOL" ]; then
             chmod +x "$SFOTOOL"
-            "$SFOTOOL" --create --title "NEBULA HUB" --title-id "NEBU00001" --app-ver "01.00" sce_sys/param.sfo
+            "$SFOTOOL" --create \
+              --title "NEBULA HUB" \
+              --title-id "NEBU00001" \
+              --app-ver "01.00" \
+              sce_sys/param.sfo
           else
-            dotnet "${{ env.PKGTOOL_DLL }}" sfo_new --title "NEBULA HUB" --title-id "NEBU00001" --app-ver "01.00" --sdk-ver "5050001" --category "gd" sce_sys/param.sfo
+            dotnet "${{ env.PKGTOOL_DLL }}" sfo_new \
+              --title "NEBULA HUB" \
+              --title-id "NEBU00001" \
+              --app-ver "01.00" \
+              --sdk-ver "5050001" \
+              --category "gd" \
+              sce_sys/param.sfo
           fi
           ls -lh sce_sys/param.sfo
 
@@ -128,8 +169,13 @@ jobs:
           chmod +x "$GP4"
           "$GP4" -out project.gp4 \
             --content-id "NEBU00001-NEBU00001_00-NEBULAHUB0000001" \
-            --app-path . --title-id "NEBU00001" --version "01.00"
+            --app-path . \
+            --title-id "NEBU00001" \
+            --version "01.00"
           dotnet "${{ env.PKGTOOL_DLL }}" pkg_build project.gp4 . nebulahub.pkg
+          echo "=============================="
+          echo "  PKG BUILT SUCCESSFULLY"
+          echo "=============================="
           ls -lh nebulahub.pkg
 
       - name: Upload PKG
