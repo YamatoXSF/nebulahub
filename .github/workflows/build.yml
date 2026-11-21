@@ -16,7 +16,11 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y clang lld llvm python3 wget curl unzip git cmake make imagemagick dotnet-sdk-8.0
+          sudo apt-get install -y \
+            clang lld llvm \
+            python3 wget curl unzip git cmake make imagemagick \
+            dotnet-sdk-8.0 \
+            libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev
 
       - name: Get OpenOrbis PS4 Toolchain
         run: |
@@ -33,7 +37,6 @@ jobs:
           cd ..
           PKGTOOL_DLL=$(find pkgtool_bin -name "PkgTool.Core.dll" | head -1)
           echo "PKGTOOL_DLL=$PKGTOOL_DLL" >> $GITHUB_ENV
-          echo "Built: $PKGTOOL_DLL"
 
       - name: Get fonts
         run: |
@@ -42,7 +45,6 @@ jobs:
           curl -sfL -o assets/fonts/NotoSans-Bold.ttf "https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Bold.ttf" || true
           [ ! -s assets/fonts/NotoSans-Regular.ttf ] && cp /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf assets/fonts/NotoSans-Regular.ttf || true
           [ ! -s assets/fonts/NotoSans-Bold.ttf ] && cp /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf assets/fonts/NotoSans-Bold.ttf || true
-          ls -lh assets/fonts/
 
       - name: Generate app icons
         run: |
@@ -56,29 +58,58 @@ jobs:
           OO="${{ env.OO_PS4_TOOLCHAIN }}"
           CLANG="$OO/bin/linux/clang++" ; [ -f "$CLANG" ] || CLANG="clang++"
           LLD="$OO/bin/linux/ld.lld"   ; [ -f "$LLD"   ] || LLD="ld.lld"
-          CXXFLAGS="-target x86_64-pc-freebsd12-elf -fPIC -funwind-tables -std=c++17 -O2 -D__ORBIS__ -I$OO/include -Isrc"
-          SRCS="src/main.cpp src/db/database.cpp src/net/fetcher.cpp src/input/controller.cpp src/install/installer.cpp src/ui/renderer.cpp src/ui/screens.cpp"
+
+          # SDL2 headers from system apt package, PS4 stubs for linking
+          SDL2_INC=$(sdl2-config --cflags 2>/dev/null || echo "-I/usr/include/SDL2")
+
+          CXXFLAGS="-target x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
+                    -std=c++17 -O2 -D__ORBIS__ \
+                    -I$OO/include -Isrc $SDL2_INC"
+
+          SRCS="src/main.cpp src/db/database.cpp src/net/fetcher.cpp \
+                src/input/controller.cpp src/install/installer.cpp \
+                src/ui/renderer.cpp src/ui/screens.cpp"
+
           OBJS=""
           for src in $SRCS; do
             obj="${src%.cpp}.o"
+            echo "Compiling $src..."
             $CLANG $CXXFLAGS -c "$src" -o "$obj"
             OBJS="$OBJS $obj"
           done
-          $LLD -m elf_x86_64 --script "$OO/link.x" --eh-frame-hdr -pie -z max-page-size=0x4000 -z relro -L"$OO/lib" $OBJS -lSDL2_stub -lSDL2_image_stub -lSDL2_ttf_stub -lSceNet_stub -lSceHttp_stub -lSceSsl_stub -lScePad_stub -lSceUserService_stub -lSceSystemService_stub -lSceVideoOut_stub -lScePthread_stub -lkernel_stub -lc -lc++ -lc++abi -o eboot.elf
+
+          $LLD -m elf_x86_64 --script "$OO/link.x" --eh-frame-hdr -pie \
+            -z max-page-size=0x4000 -z relro \
+            -L"$OO/lib" $OBJS \
+            -lSDL2_stub -lSDL2_image_stub -lSDL2_ttf_stub \
+            -lSceNet_stub -lSceHttp_stub -lSceSsl_stub \
+            -lScePad_stub -lSceUserService_stub \
+            -lSceSystemService_stub -lSceVideoOut_stub \
+            -lScePthread_stub -lkernel_stub \
+            -lc -lc++ -lc++abi \
+            -o eboot.elf
           ls -lh eboot.elf
 
       - name: Create FSELF
         run: |
           OO="${{ env.OO_PS4_TOOLCHAIN }}"
-          FSELF="" ; for n in create-fself create_fself; do [ -f "$OO/bin/linux/$n" ] && FSELF="$OO/bin/linux/$n" && break; done
+          FSELF=""
+          for n in create-fself create_fself; do
+            [ -f "$OO/bin/linux/$n" ] && FSELF="$OO/bin/linux/$n" && break
+          done
           chmod +x "$FSELF"
-          "$FSELF" -in eboot.elf -out eboot.bin --paid 0x3800000000000011 --npdrmtype fake --app --authinfo 0100000000000000F0000000FFD40000000000000000000000000000000000000000000000000000000800000000000000380000000000008000003800000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+          "$FSELF" -in eboot.elf -out eboot.bin --paid 0x3800000000000011 \
+            --npdrmtype fake --app \
+            --authinfo 0100000000000000F0000000FFD40000000000000000000000000000000000000000000000000000000800000000000000380000000000008000003800000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
           ls -lh eboot.bin
 
       - name: Build param.sfo
         run: |
           OO="${{ env.OO_PS4_TOOLCHAIN }}"
-          SFOTOOL="" ; for n in sfo_tool sfo-tool; do [ -f "$OO/bin/linux/$n" ] && SFOTOOL="$OO/bin/linux/$n" && break; done
+          SFOTOOL=""
+          for n in sfo_tool sfo-tool; do
+            [ -f "$OO/bin/linux/$n" ] && SFOTOOL="$OO/bin/linux/$n" && break
+          done
           if [ -n "$SFOTOOL" ]; then
             chmod +x "$SFOTOOL"
             "$SFOTOOL" --create --title "NEBULA HUB" --title-id "NEBU00001" --app-ver "01.00" sce_sys/param.sfo
@@ -90,9 +121,14 @@ jobs:
       - name: Build PKG
         run: |
           OO="${{ env.OO_PS4_TOOLCHAIN }}"
-          GP4="" ; for n in create-gp4 create_gp4; do [ -f "$OO/bin/linux/$n" ] && GP4="$OO/bin/linux/$n" && break; done
+          GP4=""
+          for n in create-gp4 create_gp4; do
+            [ -f "$OO/bin/linux/$n" ] && GP4="$OO/bin/linux/$n" && break
+          done
           chmod +x "$GP4"
-          "$GP4" -out project.gp4 --content-id "NEBU00001-NEBU00001_00-NEBULAHUB0000001" --app-path . --title-id "NEBU00001" --version "01.00"
+          "$GP4" -out project.gp4 \
+            --content-id "NEBU00001-NEBU00001_00-NEBULAHUB0000001" \
+            --app-path . --title-id "NEBU00001" --version "01.00"
           dotnet "${{ env.PKGTOOL_DLL }}" pkg_build project.gp4 . nebulahub.pkg
           ls -lh nebulahub.pkg
 
