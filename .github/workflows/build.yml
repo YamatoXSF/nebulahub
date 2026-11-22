@@ -20,7 +20,6 @@ jobs:
             clang lld llvm \
             python3 wget curl unzip git cmake make imagemagick \
             dotnet-sdk-8.0
-          # NOTE: do NOT install libsdl2-dev — we use OpenOrbis SDL2 stubs only
 
       - name: Get OpenOrbis PS4 Toolchain
         run: |
@@ -28,10 +27,6 @@ jobs:
             https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain.git openorbis
           find openorbis/bin/linux -type f -exec chmod +x {} \; 2>/dev/null || true
           echo "OO_PS4_TOOLCHAIN=$(pwd)/openorbis" >> $GITHUB_ENV
-          echo "Toolchain SDL2 headers:"
-          ls openorbis/include/SDL2/ 2>/dev/null || echo "(no SDL2 dir in toolchain)"
-          echo "Full include listing:"
-          ls openorbis/include/ | head -30
 
       - name: Build PkgTool.Core
         run: |
@@ -45,7 +40,6 @@ jobs:
           cd ..
           PKGTOOL_DLL=$(find pkgtool_bin -name "PkgTool.Core.dll" | head -1)
           echo "PKGTOOL_DLL=$PKGTOOL_DLL" >> $GITHUB_ENV
-          echo "Built: $PKGTOOL_DLL"
 
       - name: Get fonts
         run: |
@@ -83,18 +77,15 @@ jobs:
           CLANG="$OO/bin/linux/clang++" ; [ -f "$CLANG" ] || CLANG="clang++"
           LLD="$OO/bin/linux/ld.lld"   ; [ -f "$LLD"   ] || LLD="ld.lld"
 
-          # ONLY use OpenOrbis include dir — no system SDL2 headers
-          # OpenOrbis ships PS4-compatible SDL2 stub headers under its include/
+          # Use our bundled SDL2 stub headers from include/SDL2/
           CXXFLAGS="-target x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
                     -std=c++17 -O2 -D__ORBIS__ \
                     -I$OO/include \
-                    -Isrc \
-                    -isystem $OO/include"
+                    -Iinclude \
+                    -Isrc"
 
-          echo "Include path: $OO/include"
-          echo "SDL2 headers available:"
-          ls "$OO/include/SDL2/" 2>/dev/null || echo "No SDL2 dir — checking flat..."
-          find "$OO/include" -name "SDL.h" 2>/dev/null
+          echo "SDL2 stub headers in repo:"
+          ls include/SDL2/
 
           SRCS="src/main.cpp src/db/database.cpp src/net/fetcher.cpp \
                 src/input/controller.cpp src/install/installer.cpp \
