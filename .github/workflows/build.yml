@@ -77,15 +77,21 @@ jobs:
           CLANG="$OO/bin/linux/clang++" ; [ -f "$CLANG" ] || CLANG="clang++"
           LLD="$OO/bin/linux/ld.lld"   ; [ -f "$LLD"   ] || LLD="ld.lld"
 
-          # Use our bundled SDL2 stub headers from include/SDL2/
-          CXXFLAGS="-target x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
-                    -std=c++17 -O2 -D__ORBIS__ \
-                    -I$OO/include \
+          # Our bundled stubs first (-Iinclude), then toolchain headers
+          # -nostdinc++ and -nostdinc prevent pulling glibc internal headers
+          CXXFLAGS="-target x86_64-pc-freebsd12-elf \
+                    -fPIC -funwind-tables \
+                    -std=c++17 -O2 \
+                    -D__ORBIS__ \
                     -Iinclude \
-                    -Isrc"
+                    -I$OO/include \
+                    -Isrc \
+                    -isystem $OO/include/c++/v1 \
+                    -nostdlibinc"
 
-          echo "SDL2 stub headers in repo:"
+          echo "=== Stub headers available ==="
           ls include/SDL2/
+          ls include/orbis/
 
           SRCS="src/main.cpp src/db/database.cpp src/net/fetcher.cpp \
                 src/input/controller.cpp src/install/installer.cpp \
@@ -94,11 +100,12 @@ jobs:
           OBJS=""
           for src in $SRCS; do
             obj="${src%.cpp}.o"
-            echo "Compiling $src..."
+            echo "--- Compiling $src..."
             $CLANG $CXXFLAGS -c "$src" -o "$obj"
             OBJS="$OBJS $obj"
           done
 
+          echo "=== Linking ==="
           $LLD -m elf_x86_64 --script "$OO/link.x" --eh-frame-hdr -pie \
             -z max-page-size=0x4000 -z relro \
             -L"$OO/lib" $OBJS \
