@@ -9,6 +9,8 @@
 #include "input/controller.h"
 #include "install/installer.h"
 
+#include <sys/types.h>   // defines u_short/u_int needed by orbis/_types/kernel.h
+
 #include <orbis/libkernel.h>
 #include <orbis/UserService.h>
 #include <orbis/SystemService.h>
@@ -31,7 +33,7 @@ int main() {
     sceUserServiceInitialize(nullptr);
     scePadInit();
 
-    OrbisUserServiceInitialUser userId;
+    OrbisUserServiceUserId userId = 0;   // real signature: int sceUserServiceGetInitialUser(int*)
     sceUserServiceGetInitialUser(&userId);
 
     // SDL init

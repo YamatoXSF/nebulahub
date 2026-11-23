@@ -40,7 +40,8 @@ struct DownloadJob {
         uint64_t rem  = totalBytes - bytesDown;
         uint64_t secs = (uint64_t)(rem / speedBps);
         char buf[16];
-        snprintf(buf, sizeof(buf), "%02llu:%02llu", secs/60, secs%60);
+        snprintf(buf, sizeof(buf), "%02llu:%02llu",
+                 (unsigned long long)(secs/60), (unsigned long long)(secs%60));
         return buf;
     }
 };
