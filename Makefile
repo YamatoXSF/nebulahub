@@ -22,6 +22,9 @@ CXXFLAGS := \
     -std=c++17 \
     -O2 \
     -D__ORBIS__ \
+    -D_DEFAULT_SOURCE \
+    -D_BSD_SOURCE \
+    -D_POSIX_C_SOURCE=200809L \
     -isysroot $(OO) \
     -isystem $(OO)/include/c++/v1 \
     -isystem $(OO)/include \
