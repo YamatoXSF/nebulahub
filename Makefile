@@ -1,48 +1,46 @@
 # ─────────────────────────────────────────────────────────────
 #  NEBULA HUB — Makefile
-#  Requires: OpenOrbis PS4 Toolchain + LibOrbisPkg (PkgTool.Core)
+#  Designed to run INSIDE the official OpenOrbis Docker container:
+#    docker run --rm -w /workspace -v "$(pwd)":/workspace \
+#      openorbisofficial/toolchain:latest make
+#
+#  Inside that container, OO_PS4_TOOLCHAIN is already set and
+#  clang/clang++/lld are already on PATH with the correct PS4
+#  musl libc + libc++ + SDL2 + PS4 stub libraries pre-built.
 # ─────────────────────────────────────────────────────────────
 
-TITLE       := NEBULA HUB
-TITLE_ID    := NEBU00001
-APP_VER     := 01.00
-PKG_OUT     := nebulahub.pkg
+TARGET      := x86_64-pc-freebsd12-elf
+OO          := $(OO_PS4_TOOLCHAIN)
 
-OO_PS4_TOOLCHAIN ?= $(OO_PS4_TOOLCHAIN)
+CXX         := clang++
+LD          := clang++
 
-TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
-CC          := $(TOOLCHAIN)/bin/linux/clang
-CXX         := $(TOOLCHAIN)/bin/linux/clang++
-LD          := $(TOOLCHAIN)/bin/linux/ld.lld
-OBJCOPY     := objcopy
-PYTHON      := python3
-
-CXXFLAGS    := \
-    -target x86_64-pc-freebsd12-elf \
+CXXFLAGS := \
+    --target=$(TARGET) \
     -fPIC \
     -funwind-tables \
     -std=c++17 \
     -O2 \
-    -Wall \
-    -Wno-unused-variable \
-    -Wno-unused-function \
     -D__ORBIS__ \
-    -DUSE_SDL2 \
-    -isysroot $(TOOLCHAIN)/include \
-    -I$(TOOLCHAIN)/include \
+    -isysroot $(OO) \
+    -isystem $(OO)/include \
     -Isrc
 
-LDFLAGS     := \
-    -m elf_x86_64 \
-    --script $(TOOLCHAIN)/link.x \
-    --eh-frame-hdr \
-    -pie \
-    -z max-page-size=0x4000 \
-    -z relro \
-    -L$(TOOLCHAIN)/lib \
-    -lSDL2 \
-    -lSDL2_image \
-    -lSDL2_ttf \
+LDFLAGS := \
+    --target=$(TARGET) \
+    -fuse-ld=lld \
+    -isysroot $(OO) \
+    -Wl,--eh-frame-hdr \
+    -Wl,-pie \
+    -Wl,-z,max-page-size=0x4000 \
+    -Wl,-z,relro \
+    -Wl,--script=$(OO)/link.x \
+    -L$(OO)/lib
+
+LIBS := \
+    -lSDL2_stub \
+    -lSDL2_image_stub \
+    -lSDL2_ttf_stub \
     -lSceNet_stub \
     -lSceHttp_stub \
     -lSceSsl_stub \
@@ -56,7 +54,6 @@ LDFLAGS     := \
     -lc++ \
     -lc++abi
 
-# ─── Sources ───
 SRCS := \
     src/main.cpp \
     src/db/database.cpp \
@@ -68,47 +65,32 @@ SRCS := \
 
 OBJS := $(SRCS:.cpp=.o)
 
-# ─── Build targets ───
+.PHONY: all clean eboot fself gp4 pkg
 
-all: $(PKG_OUT)
+all: eboot.bin project.gp4
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 eboot.elf: $(OBJS)
-	$(LD) $(LDFLAGS) -o $@ $^
+	$(LD) $(LDFLAGS) $(OBJS) $(LIBS) -o $@
 
 eboot.bin: eboot.elf
-	$(PYTHON) $(TOOLCHAIN)/scripts/create-eboot.py \
+	$(OO)/bin/linux/create-fself \
 	    -in eboot.elf \
 	    -out eboot.bin \
-	    -paid 0x3800000000000011
+	    --paid 0x3800000000000011 \
+	    --npdrmtype fake \
+	    --app \
+	    --authinfo 0100000000000000F0000000FFD40000000000000000000000000000000000000000000000000000000800000000000000380000000000008000003800000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
-$(PKG_OUT): eboot.bin
-	# Generate param.sfo from descriptor
-	$(TOOLCHAIN)/bin/linux/sfo_tool \
-	    --create \
-	    --title "$(TITLE)" \
-	    --title-id "$(TITLE_ID)" \
-	    --app-ver "$(APP_VER)" \
-	    sce_sys/param.sfo
-
-	# Generate .gp4 project
-	$(PYTHON) $(TOOLCHAIN)/scripts/create-gp4.py \
+project.gp4: eboot.bin
+	$(OO)/bin/linux/create-gp4 \
 	    -out project.gp4 \
-	    --content-id "$(TITLE_ID)-$(TITLE_ID)_00-NEBULAHUB0000001" \
+	    --content-id "NEBU00001-NEBU00001_00-NEBULAHUB0000001" \
 	    --app-path . \
-	    --title-id "$(TITLE_ID)"
-
-	# Build PKG
-	dotnet $(TOOLCHAIN)/bin/PkgTool.Core.dll \
-	    pkg_build project.gp4 . $(PKG_OUT)
-
-	@echo ""
-	@echo "✅  $(PKG_OUT) built successfully"
-	@echo "    Copy to USB and install via GoldHEN > Package Installer"
+	    --title-id "NEBU00001" \
+	    --version "01.00"
 
 clean:
-	rm -f $(OBJS) eboot.elf eboot.bin project.gp4 sce_sys/param.sfo $(PKG_OUT)
-
-.PHONY: all clean
+	rm -f $(OBJS) eboot.elf eboot.bin project.gp4
