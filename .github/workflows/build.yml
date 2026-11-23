@@ -73,6 +73,10 @@ jobs:
         run: |
           docker pull openorbisofficial/toolchain:latest
 
+          # Make the whole workspace writable so the container (running as
+          # a different internal user) can create .o files, eboot.elf, etc.
+          chmod -R 777 "$(pwd)"
+
           docker run --rm \
             -w /workspace \
             -v "$(pwd)":/workspace \
