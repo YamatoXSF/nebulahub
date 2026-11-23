@@ -81,7 +81,7 @@ jobs:
             -w /workspace \
             -v "$(pwd)":/workspace \
             openorbisofficial/toolchain:latest \
-            bash -c "echo '=== Toolchain env ===' && echo \$OO_PS4_TOOLCHAIN && ls \$OO_PS4_TOOLCHAIN/include | head -20 && echo '=== SDL2 headers ===' && ls \$OO_PS4_TOOLCHAIN/include/SDL2/ 2>/dev/null | head -10 && echo '=== Building ===' && make all"
+            bash -c "echo '=== Toolchain env ===' && echo \$OO_PS4_TOOLCHAIN && echo '=== C++ stdlib headers search ===' && find \$OO_PS4_TOOLCHAIN -iname 'string' -o -iname 'v1' 2>/dev/null && echo '=== Building ===' && make all"
 
           echo "=== Build artifacts ==="
           ls -lh eboot.elf eboot.bin project.gp4

@@ -23,6 +23,7 @@ CXXFLAGS := \
     -O2 \
     -D__ORBIS__ \
     -isysroot $(OO) \
+    -isystem $(OO)/include/c++/v1 \
     -isystem $(OO)/include \
     -Isrc
 
