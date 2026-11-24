@@ -1,6 +1,7 @@
 #pragma once
 #include "../nebula.h"
 #include "../db/database.h"
+#include <orbis/UserService.h>
 #include <string>
 #include <functional>
 

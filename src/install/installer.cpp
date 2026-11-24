@@ -1,6 +1,6 @@
 // NEBULA HUB — Installer
 // Avatar path: copy xavatar → /data/AVATARS/
-// Theme path:  copy PKGs → /data/pkg/ then trigger sceSystemServiceInstallUpdate
+// Theme path:  copy PKGs → /data/pkg/ for GoldHEN's own PKG installer to pick up
 
 #include "installer.h"
 
@@ -118,9 +118,16 @@ bool Installer::installTheme(const ContentEntry& entry,
 // ─────────────────────────────────────────────
 
 bool Installer::launchPkgInstall(const std::string& pkgPath) {
-    // sceSystemServiceInstallUpdate — takes path to PKG
-    int ret = sceSystemServiceInstallUpdate(pkgPath.c_str());
-    return ret >= 0;
+    // NOTE: there is no documented single-call PS4 SDK function that
+    // triggers a PKG install from inside a homebrew app. Real homebrew
+    // tools (4PT, FPKGi) copy the PKG into a GoldHEN-watched folder and
+    // rely on GoldHEN's own background installer to pick it up, or on
+    // the user manually opening GoldHEN's Package Installer. We've
+    // already copied the file to PKG_INSTALL_DIR by this point (see
+    // installTheme/installAvatar above) — that's the real, verified
+    // part. This function just confirms the file landed there.
+    struct stat st{};
+    return stat(pkgPath.c_str(), &st) == 0;
 }
 
 bool Installer::isPkgInstallPending(const std::string& contentId) {
@@ -135,9 +142,9 @@ bool Installer::isPkgInstallPending(const std::string& contentId) {
 // ─────────────────────────────────────────────
 
 void Installer::notify(const std::string& title, const std::string& msg) {
-    // PS4 toast notification — same API used by most homebrews
-    OrbisSystemServiceParamId params{};
-    sceSystemServiceLoadExec("notification", nullptr);
-    // Fallback: simple printf to klog
+    // A real PS4 on-screen toast notification needs a verified SDK call
+    // we don't have yet — this logs to klog/stdout instead, which is
+    // visible over a debug network console. Swap in the real
+    // notification API once it's confirmed against the actual SDK.
     printf("[NEBULA HUB] %s: %s\n", title.c_str(), msg.c_str());
 }
