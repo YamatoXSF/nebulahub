@@ -35,6 +35,7 @@ LDFLAGS := \
     --target=$(TARGET) \
     -fuse-ld=lld \
     -isysroot $(OO) \
+    -B$(OO)/lib \
     -Wl,--eh-frame-hdr \
     -Wl,-pie \
     -Wl,-z,max-page-size=0x4000 \
