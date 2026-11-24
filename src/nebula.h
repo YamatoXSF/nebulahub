@@ -26,7 +26,7 @@
 #define COL_BG           0x0A0A14FF   // deep navy
 #define COL_PANEL        0x12121EFF   // panel
 #define COL_PANEL_ALT    0x1A1A2EFF   // lighter panel
-#define COL_ACCENT       0x7B2FFF FF  // nebula purple
+#define COL_ACCENT       0x7B2FFFFF   // nebula purple
 #define COL_ACCENT2      0xFF5DB1FF   // pink
 #define COL_TEXT         0xEEEEEEFF
 #define COL_SUBTEXT      0x888899FF
