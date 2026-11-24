@@ -2,6 +2,8 @@
 // OVERRIDE for the toolchain's own orbis/Http.h — see Net.h for why.
 // Signatures match long-established community PS4 homebrew convention.
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -25,13 +27,13 @@ int  sceHttpCreateConnectionWithURL(int tmplId, const char* url, int isEnableKee
 int  sceHttpDeleteConnection(int connId);
 
 int  sceHttpCreateRequestWithURL(int connId, int method, const char* url,
-                                  unsigned long long contentLength);
+                                  uint64_t contentLength);
 int  sceHttpDeleteRequest(int reqId);
 
 int  sceHttpSendRequest(int reqId, const void* postData, unsigned int size);
 
 int  sceHttpGetStatusCode(int reqId, int* statusCode);
-int  sceHttpGetContentLength(int reqId, unsigned long long* contentLength);
+int  sceHttpGetContentLength(int reqId, uint64_t* contentLength);
 
 int  sceHttpReadData(int reqId, void* data, unsigned int size);
 
