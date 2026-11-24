@@ -16,6 +16,7 @@ CXX         := clang++
 LD          := clang++
 
 CXXFLAGS := \
+    -Iinclude \
     --target=$(TARGET) \
     -fPIC \
     -funwind-tables \
