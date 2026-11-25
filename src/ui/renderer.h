@@ -1,7 +1,6 @@
 #pragma once
 #include "../nebula.h"
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
 #include <string>
 #include <unordered_map>
@@ -70,8 +69,8 @@ private:
     SDL_Renderer* sdl_;
 
     // Font cache keyed by size+bold
-    std::unordered_map<std::string, TTF_Font*> fonts_;
-    TTF_Font* getFont(int size, bool bold);
+    // Font cache removed — SDL2_ttf isn't bundled in this toolchain image.
+    // text()/measureText() below degrade to layout-safe placeholders.
 
     // Texture cache keyed by path
     std::unordered_map<std::string, SDL_Texture*> texCache_;

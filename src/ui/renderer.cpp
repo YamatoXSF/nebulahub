@@ -8,25 +8,11 @@
 Renderer::Renderer(SDL_Renderer* r) : sdl_(r) {}
 
 Renderer::~Renderer() {
-    for (auto& [k, f] : fonts_) TTF_CloseFont(f);
     for (auto& [k, t] : texCache_) SDL_DestroyTexture(t);
 }
 
-TTF_Font* Renderer::getFont(int size, bool bold) {
-    std::string key = fontKey(size, bold);
-    auto it = fonts_.find(key);
-    if (it != fonts_.end()) return it->second;
-    const char* path = bold
-        ? "assets/fonts/NotoSans-Bold.ttf"
-        : "assets/fonts/NotoSans-Regular.ttf";
-    TTF_Font* f = TTF_OpenFont(path, size);
-    if (!f) {
-        // Fallback: try next size or return nullptr
-        return nullptr;
-    }
-    fonts_[key] = f;
-    return f;
-}
+// getFont() removed — SDL2_ttf isn't bundled in this toolchain image.
+// text()/measureText() below use geometry-only placeholders instead.
 
 void Renderer::clear(Color bg) {
     SDL_SetRenderDrawColor(sdl_, bg.r, bg.g, bg.b, bg.a);
@@ -98,37 +84,29 @@ void Renderer::gradientH(int x, int y, int w, int h, Color left, Color right) {
     }
 }
 
+// TEXT RENDERING IS TEMPORARILY DISABLED.
+// SDL2_ttf is not bundled in this toolchain's Docker image, and no
+// replacement (e.g. direct FreeType glyph rendering) has been written
+// and verified yet. The functions below do NOT draw any glyphs — they
+// keep the same signatures and return layout-safe estimated sizes so
+// every other screen's positioning math (centering, wrapping, button
+// sizing) still works correctly once real text rendering is added back.
+// Next step to restore real text: either locate SDL2_ttf under a
+// different name in the toolchain, or implement glyph rendering
+// directly against libfreetype.a (confirmed present in this toolchain).
+
 void Renderer::text(const std::string& str, int x, int y, Color c,
                     int size, bool bold, bool shadow) {
-    if (str.empty()) return;
-    TTF_Font* f = getFont(size, bold);
-    if (!f) return;
-    if (shadow) {
-        SDL_Color sc{0, 0, 0, 160};
-        SDL_Surface* ss = TTF_RenderUTF8_Blended(f, str.c_str(), sc);
-        if (ss) {
-            SDL_Texture* st = SDL_CreateTextureFromSurface(sdl_, ss);
-            SDL_Rect dr{x+2, y+2, ss->w, ss->h};
-            SDL_RenderCopy(sdl_, st, nullptr, &dr);
-            SDL_DestroyTexture(st);
-            SDL_FreeSurface(ss);
-        }
-    }
-    SDL_Color sc{c.r, c.g, c.b, c.a};
-    SDL_Surface* surf = TTF_RenderUTF8_Blended(f, str.c_str(), sc);
-    if (!surf) return;
-    SDL_Texture* tex = SDL_CreateTextureFromSurface(sdl_, surf);
-    SDL_Rect dr{x, y, surf->w, surf->h};
-    SDL_RenderCopy(sdl_, tex, nullptr, &dr);
-    SDL_DestroyTexture(tex);
-    SDL_FreeSurface(surf);
+    (void)str; (void)x; (void)y; (void)c; (void)size; (void)bold; (void)shadow;
+    // Intentionally draws nothing — see note above.
 }
 
 SDL_Point Renderer::measureText(const std::string& str, int size, bool bold) {
-    TTF_Font* f = getFont(size, bold);
-    if (!f) return {0, 0};
-    int w = 0, h = 0;
-    TTF_SizeUTF8(f, str.c_str(), &w, &h);
+    // Rough proportional-font estimate: ~0.55 * size per character.
+    // Real metrics will differ once actual glyph rendering is in place.
+    int w = (int)(str.size() * size * 0.55f);
+    int h = (int)(size * 1.2f);
+    (void)bold;
     return {w, h};
 }
 
@@ -141,17 +119,13 @@ void Renderer::textCentered(const std::string& str, int rx, int ry, int rw, int 
 }
 
 std::string Renderer::truncate(const std::string& str, int maxWidth, int size, bool bold) {
-    TTF_Font* f = getFont(size, bold);
-    if (!f) return str;
-    int w = 0, h = 0;
-    TTF_SizeUTF8(f, str.c_str(), &w, &h);
-    if (w <= maxWidth) return str;
+    auto dim = measureText(str, size, bold);
+    if (dim.x <= maxWidth) return str;
     std::string s = str;
     while (!s.empty()) {
         s.pop_back();
-        std::string t = s + "…";
-        TTF_SizeUTF8(f, t.c_str(), &w, &h);
-        if (w <= maxWidth) return t;
+        auto d2 = measureText(s + "…", size, bold);
+        if (d2.x <= maxWidth) return s + "…";
     }
     return "…";
 }

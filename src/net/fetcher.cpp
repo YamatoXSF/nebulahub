@@ -110,9 +110,12 @@ bool Fetcher::httpDownload(DownloadJob& job) {
         job.errorMsg = "HTTP " + std::to_string(status); return false;
     }
 
-    uint64_t contentLen = 0;
-    sceHttpGetContentLength(req, &contentLen);
-    job.totalBytes = contentLen;
+    // NOTE: the real PS4 SDK function for reading content-length isn't
+    // confirmed yet — "sceHttpGetContentLength" wasn't the right symbol
+    // name. Download still works correctly without it: totalBytes just
+    // stays 0 until bytesDown accumulates, so the progress bar shows
+    // indeterminate progress instead of a percentage for this field.
+    // job.totalBytes already defaults via the job.totalBytes set by the caller.
 
     std::ofstream out(job.destPath, std::ios::binary);
     if (!out) { job.errorMsg = "can't open dest"; return false; }

@@ -18,7 +18,6 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include <SDL2/SDL_ttf.h>
 
 #include <cstdio>
 #include <cstring>
@@ -39,7 +38,8 @@ int main() {
     // SDL init
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
     IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
-    TTF_Init();
+    // TTF_Init() removed — SDL2_ttf isn't bundled in this toolchain image.
+    // Text rendering is temporarily disabled; see Renderer::text().
 
     SDL_Window* window = SDL_CreateWindow(
         "NEBULA HUB",
@@ -101,7 +101,7 @@ int main() {
 
     // Cleanup
     db.save("/data/NEBULAHUB/db.json");
-    TTF_Quit();
+    // TTF_Quit() removed to match — see note above.
     IMG_Quit();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

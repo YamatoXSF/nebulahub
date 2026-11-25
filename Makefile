@@ -58,6 +58,8 @@ LIBS := \
     -lSDL2 \
     -lSDL2_image \
     -lSceNet \
+    -lSceNetCtl \
+    -lSceAudioOut \
     -lSceHttp \
     -lSceSsl \
     -lScePad \
