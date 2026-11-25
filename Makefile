@@ -84,7 +84,8 @@ OBJS := $(SRCS:.cpp=.o)
 
 .PHONY: all clean eboot fself gp4 pkg
 
-all: eboot.bin project.gp4
+all: eboot.bin
+	@echo "eboot.bin built — GP4/PKG step handled separately until the real tool syntax is confirmed."
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -93,22 +94,13 @@ eboot.elf: $(OBJS)
 	$(LD) $(LDFLAGS) $(CRT_START) $(OBJS) $(LIBS) $(CRT_END) -o $@
 
 eboot.bin: eboot.elf
-	chmod +x $(OO)/bin/linux/create-fself $(OO)/bin/linux/create-gp4 2>/dev/null || true
-	$(OO)/bin/linux/create-fself \
+	$(OO)/bin/linux/create-eboot \
 	    -in eboot.elf \
 	    -out eboot.bin \
 	    --paid 0x3800000000000011 \
 	    --npdrmtype fake \
 	    --app \
 	    --authinfo 0100000000000000F0000000FFD40000000000000000000000000000000000000000000000000000000800000000000000380000000000008000003800000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-
-project.gp4: eboot.bin
-	$(OO)/bin/linux/create-gp4 \
-	    -out project.gp4 \
-	    --content-id "NEBU00001-NEBU00001_00-NEBULAHUB0000001" \
-	    --app-path . \
-	    --title-id "NEBU00001" \
-	    --version "01.00"
 
 clean:
 	rm -f $(OBJS) eboot.elf eboot.bin project.gp4

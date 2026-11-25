@@ -20,20 +20,6 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y curl unzip imagemagick dotnet-sdk-8.0 fonts-dejavu
 
-      # ── Build PkgTool.Core (host side — needs dotnet, PS4 image doesn't have it) ──
-      - name: Build PkgTool.Core
-        run: |
-          git clone --depth 1 https://github.com/OpenOrbis/LibOrbisPkg.git pkgtool_src
-          cd pkgtool_src
-          dotnet build PkgTool.Core/PkgTool.Core.csproj \
-            --configuration Release \
-            --output ../pkgtool_bin \
-            -p:TargetFramework=net8.0
-          cd ..
-          PKGTOOL_DLL=$(find pkgtool_bin -name "PkgTool.Core.dll" | head -1)
-          echo "PKGTOOL_DLL=$PKGTOOL_DLL" >> $GITHUB_ENV
-          echo "PkgTool built: $PKGTOOL_DLL"
-
       # ── Fonts (host side) ─────────────────────────────────────────────────
       - name: Get fonts
         run: |
@@ -81,38 +67,17 @@ jobs:
             -w /workspace \
             -v "$(pwd)":/workspace \
             openorbisofficial/toolchain:latest \
-            bash -c "echo '=== Every fself/gp4/pkg-related file anywhere in the image ===' && find / \\( -iname '*fself*' -o -iname '*gp4*' -o -iname 'autobuild*' \\) 2>/dev/null | grep -v '^/proc/' && echo '=== Full bin/linux listing ===' && ls -la \$OO_PS4_TOOLCHAIN/bin/linux/ 2>/dev/null && echo '=== Full scripts listing ===' && ls -la \$OO_PS4_TOOLCHAIN/bin/scripts/ 2>/dev/null && echo '=== make all skipped this round — diagnostic only ===' "
+            bash -c "make all && echo '=== eboot.bin built — now gathering real PkgTool.Core + GP4 info ===' && echo '--- PkgTool.Core usage (no args) ---' && \$OO_PS4_TOOLCHAIN/bin/linux/PkgTool.Core 2>&1 | head -60 && echo '--- real template.gp4 content ---' && cat \$OO_PS4_TOOLCHAIN/bin/data/template.gp4 && echo '--- real make_fself.py (for reference, not run) ---' && head -40 \$OO_PS4_TOOLCHAIN/scripts/make_fself.py"
 
           echo "=== Build artifacts ==="
-          ls -lh eboot.elf eboot.bin project.gp4
+          ls -lh eboot.elf eboot.bin
 
-      # ── param.sfo (host side, via PkgTool.Core) ───────────────────────────
-      - name: Build param.sfo
-        run: |
-          dotnet "${{ env.PKGTOOL_DLL }}" sfo_new \
-            --title "NEBULA HUB" \
-            --title-id "NEBU00001" \
-            --app-ver "01.00" \
-            --sdk-ver "5050001" \
-            --category "gd" \
-            sce_sys/param.sfo
-          ls -lh sce_sys/param.sfo
-
-      # ── Final PKG build (host side, via PkgTool.Core) ─────────────────────
-      - name: Build PKG
-        run: |
-          dotnet "${{ env.PKGTOOL_DLL }}" pkg_build project.gp4 . nebulahub.pkg
-          echo "=============================="
-          echo "  PKG BUILT SUCCESSFULLY"
-          echo "=============================="
-          ls -lh nebulahub.pkg
-
-      - name: Upload PKG artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: nebulahub-pkg
-          path: nebulahub.pkg
-          retention-days: 90
+      # NOTE: param.sfo and final PKG assembly are intentionally NOT attempted
+      # this round. We now have a real toolchain-provided PkgTool.Core binary
+      # (bin/linux/PkgTool.Core, no dotnet needed) and a real template.gp4 —
+      # but haven't seen either one's actual required syntax/fields yet. The
+      # step above prints both so the next commit can use them with certainty
+      # instead of guessing subcommand names again.
 
       - name: Create GitHub Release on tag
         if: startsWith(github.ref, 'refs/tags/')
