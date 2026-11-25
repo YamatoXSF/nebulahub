@@ -93,6 +93,7 @@ eboot.elf: $(OBJS)
 	$(LD) $(LDFLAGS) $(CRT_START) $(OBJS) $(LIBS) $(CRT_END) -o $@
 
 eboot.bin: eboot.elf
+	chmod +x $(OO)/bin/linux/create-fself $(OO)/bin/linux/create-gp4 2>/dev/null || true
 	$(OO)/bin/linux/create-fself \
 	    -in eboot.elf \
 	    -out eboot.bin \

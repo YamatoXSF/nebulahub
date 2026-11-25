@@ -81,7 +81,7 @@ jobs:
             -w /workspace \
             -v "$(pwd)":/workspace \
             openorbisofficial/toolchain:latest \
-            bash -c "echo '=== Searching entire image (not just toolchain dir) for ttf/freetype ===' && find / -iname '*ttf*' -o -iname '*freetype*' 2>/dev/null | grep -v '/proc/' && echo '=== Building ===' && make all"
+            bash -c "echo '=== Real contents of bin/linux (names + permissions) ===' && ls -la \$OO_PS4_TOOLCHAIN/bin/linux/ && echo '=== Building ===' && make all"
 
           echo "=== Build artifacts ==="
           ls -lh eboot.elf eboot.bin project.gp4
