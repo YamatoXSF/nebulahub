@@ -81,7 +81,7 @@ jobs:
             -w /workspace \
             -v "$(pwd)":/workspace \
             openorbisofficial/toolchain:latest \
-            bash -c "echo '=== Real contents of bin/linux (names + permissions) ===' && ls -la \$OO_PS4_TOOLCHAIN/bin/linux/ && echo '=== Building ===' && make all"
+            bash -c "echo '=== Every fself/gp4/pkg-related file anywhere in the image ===' && find / \\( -iname '*fself*' -o -iname '*gp4*' -o -iname 'autobuild*' \\) 2>/dev/null | grep -v '^/proc/' && echo '=== Full bin/linux listing ===' && ls -la \$OO_PS4_TOOLCHAIN/bin/linux/ 2>/dev/null && echo '=== Full scripts listing ===' && ls -la \$OO_PS4_TOOLCHAIN/bin/scripts/ 2>/dev/null && echo '=== make all skipped this round — diagnostic only ===' "
 
           echo "=== Build artifacts ==="
           ls -lh eboot.elf eboot.bin project.gp4
