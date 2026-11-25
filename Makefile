@@ -29,13 +29,17 @@ CXXFLAGS := \
     -isysroot $(OO) \
     -isystem $(OO)/include/c++/v1 \
     -isystem $(OO)/include \
-    -Isrc
+    -Isrc \
+    -rtlib=compiler-rt \
+    --unwindlib=libunwind
 
 LDFLAGS := \
     --target=$(TARGET) \
     -fuse-ld=lld \
     -isysroot $(OO) \
     -B$(OO)/lib \
+    -rtlib=compiler-rt \
+    --unwindlib=libunwind \
     -Wl,--eh-frame-hdr \
     -Wl,-pie \
     -Wl,-z,max-page-size=0x4000 \
@@ -44,18 +48,18 @@ LDFLAGS := \
     -L$(OO)/lib
 
 LIBS := \
-    -lSDL2_stub \
-    -lSDL2_image_stub \
-    -lSDL2_ttf_stub \
-    -lSceNet_stub \
-    -lSceHttp_stub \
-    -lSceSsl_stub \
-    -lScePad_stub \
-    -lSceUserService_stub \
-    -lSceSystemService_stub \
-    -lSceVideoOut_stub \
-    -lScePthread_stub \
-    -lkernel_stub \
+    -lSDL2 \
+    -lSDL2_image \
+    -lSDL2_ttf \
+    -lSceNet \
+    -lSceHttp \
+    -lSceSsl \
+    -lScePad \
+    -lSceUserService \
+    -lSceSystemService \
+    -lSceVideoOut \
+    -lScePthread \
+    -lkernel \
     -lc \
     -lc++ \
     -lc++abi
