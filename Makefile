@@ -38,6 +38,7 @@ LDFLAGS := \
     -fuse-ld=lld \
     -isysroot $(OO) \
     -nostartfiles \
+    --unwindlib=libunwind \
     -Wl,--eh-frame-hdr \
     -Wl,-pie \
     -Wl,-z,max-page-size=0x4000 \
