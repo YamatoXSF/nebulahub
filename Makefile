@@ -38,6 +38,7 @@ LDFLAGS := \
     -fuse-ld=lld \
     -isysroot $(OO) \
     -nostartfiles \
+    -nodefaultlibs \
     --unwindlib=libunwind \
     -Wl,--eh-frame-hdr \
     -Wl,-pie \
