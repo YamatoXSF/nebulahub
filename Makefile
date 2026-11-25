@@ -37,9 +37,7 @@ LDFLAGS := \
     --target=$(TARGET) \
     -fuse-ld=lld \
     -isysroot $(OO) \
-    -B$(OO)/lib \
-    -rtlib=compiler-rt \
-    --unwindlib=libunwind \
+    -nostartfiles \
     -Wl,--eh-frame-hdr \
     -Wl,-pie \
     -Wl,-z,max-page-size=0x4000 \
@@ -47,10 +45,16 @@ LDFLAGS := \
     -Wl,--script=$(OO)/link.x \
     -L$(OO)/lib
 
+# crt1.o/crti.o go first, crtn.o goes last — confirmed to exist in $(OO)/lib
+# (crtbegin.o/crtend.o do NOT exist in this toolchain, so we bypass clang's
+# automatic GCC-style startup-file insertion entirely with -nostartfiles
+# above, and place only the three real files ourselves, in order)
+CRT_START := $(OO)/lib/crt1.o $(OO)/lib/crti.o
+CRT_END   := $(OO)/lib/crtn.o
+
 LIBS := \
     -lSDL2 \
     -lSDL2_image \
-    -lSDL2_ttf \
     -lSceNet \
     -lSceHttp \
     -lSceSsl \
@@ -58,11 +62,10 @@ LIBS := \
     -lSceUserService \
     -lSceSystemService \
     -lSceVideoOut \
-    -lScePthread \
+    -lpthread \
     -lkernel \
     -lc \
-    -lc++ \
-    -lc++abi
+    -lc++
 
 SRCS := \
     src/main.cpp \
@@ -83,7 +86,7 @@ all: eboot.bin project.gp4
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 eboot.elf: $(OBJS)
-	$(LD) $(LDFLAGS) $(OBJS) $(LIBS) -o $@
+	$(LD) $(LDFLAGS) $(CRT_START) $(OBJS) $(LIBS) $(CRT_END) -o $@
 
 eboot.bin: eboot.elf
 	$(OO)/bin/linux/create-fself \

@@ -81,7 +81,7 @@ jobs:
             -w /workspace \
             -v "$(pwd)":/workspace \
             openorbisofficial/toolchain:latest \
-            bash -c "echo '=== SDL2_ttf and kernel lib check ===' && find \$OO_PS4_TOOLCHAIN -iname '*ttf*' -o -iname '*kernel*' 2>/dev/null | grep -v '/include/' && echo '=== Building ===' && make all"
+            bash -c "echo '=== Searching entire image (not just toolchain dir) for ttf/freetype ===' && find / -iname '*ttf*' -o -iname '*freetype*' 2>/dev/null | grep -v '/proc/' && echo '=== Building ===' && make all"
 
           echo "=== Build artifacts ==="
           ls -lh eboot.elf eboot.bin project.gp4
