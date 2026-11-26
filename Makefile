@@ -96,8 +96,7 @@ eboot.elf: $(OBJS)
 eboot.bin: eboot.elf
 	$(OO)/bin/linux/create-eboot \
 	    -in eboot.elf \
-	    -out eboot.oelf \
-	    -eboot eboot.bin \
+	    -out eboot.bin \
 	    -paid 0x3800000000000011 \
 	    -ptype fake
 

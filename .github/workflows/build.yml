@@ -70,7 +70,7 @@ jobs:
             bash -c "make all && echo '=== eboot.bin built — gathering real PkgTool.Core + GP4 info for the packaging step ===' && echo '--- PkgTool.Core usage (no args) ---' && \$OO_PS4_TOOLCHAIN/bin/linux/PkgTool.Core 2>&1 | head -80 && echo '--- real template.gp4 content ---' && cat \$OO_PS4_TOOLCHAIN/bin/data/template.gp4"
 
           echo "=== Build artifacts ==="
-          ls -lh eboot.elf eboot.oelf eboot.bin 2>&1 || true
+          ls -lh eboot.elf eboot.bin 2>&1 || true
 
       # NOTE: param.sfo and final PKG assembly are intentionally NOT attempted
       # this round. We now have a real toolchain-provided PkgTool.Core binary
