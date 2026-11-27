@@ -19,7 +19,10 @@ CXXFLAGS := \
     -Iinclude \
     --target=$(TARGET) \
     -fPIC \
-    -funwind-tables \
+    -fno-exceptions \
+    -fno-asynchronous-unwind-tables \
+    -fno-unwind-tables \
+    -fno-rtti \
     -std=c++17 \
     -O2 \
     -D__ORBIS__ \

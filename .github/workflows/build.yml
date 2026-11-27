@@ -67,7 +67,7 @@ jobs:
             -w /workspace \
             -v "$(pwd)":/workspace \
             openorbisofficial/toolchain:latest \
-            bash -c "make eboot.elf; echo '--- section headers of our real eboot.elf (checking specifically for .got.plt) ---'; \$OO_PS4_TOOLCHAIN/bin/linux/readelf -S eboot.elf 2>&1; echo '--- attempting create-eboot step ---'; make all; echo '--- PkgTool.Core usage (no args) ---'; \$OO_PS4_TOOLCHAIN/bin/linux/PkgTool.Core 2>&1 | head -80; echo '--- real template.gp4 content ---'; cat \$OO_PS4_TOOLCHAIN/bin/data/template.gp4"
+            bash -c "make eboot.elf; echo '--- section sizes after removing exceptions/unwind tables (checking .eh_frame/.gcc_except_table shrank) ---'; \$OO_PS4_TOOLCHAIN/bin/linux/readelf -S eboot.elf 2>&1 | grep -A1 -i 'eh_frame\\|except_table\\|got.plt'; echo '--- attempting create-eboot step ---'; make all; echo '--- PkgTool.Core usage (no args) ---'; \$OO_PS4_TOOLCHAIN/bin/linux/PkgTool.Core 2>&1 | head -80; echo '--- real template.gp4 content ---'; cat \$OO_PS4_TOOLCHAIN/bin/data/template.gp4"
 
           echo "=== Build artifacts ==="
           ls -lh eboot.elf eboot.bin 2>&1 || true
